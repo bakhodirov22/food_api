@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+import os
 import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.database import get_db
 
-SECRET_KEY = "bu-yerga-uzun-va-sirli-matn-yozing-123456"
+SECRET_KEY = os.getenv("SECRET_KEY", "faqat-lokal-uchun-kalit")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
