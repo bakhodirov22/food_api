@@ -17,4 +17,4 @@ app.include_router(orders.router)
 
 @app.get("/")
 def home():
-    return {"message": "Food API ishlayapti!"}
+    return {"message": "Food API ishlayapti! CD sinovi v2"}
