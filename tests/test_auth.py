@@ -1,3 +1,4 @@
+import pytest
 import jwt
 
 from app.auth import ALGORITHM, SECRET_KEY
@@ -86,4 +87,30 @@ def test_me_without_token(client):
 
 def test_me_invalid_token(client):
     response = client.get("/auth/me", headers={"Authorization": "Bearer yaroqsiz"})
+    assert response.status_code == 401
+
+@pytest.mark.parametrize(
+    "email, password, status_code",
+    [
+        ("ali@example.com", "123456", 200),       # to'g'ri
+        ("ali@example.com", "noto'g'ri", 401),    # noto'g'ri parol
+        ("yoq@example.com", "123456", 401),       # bunday email yo'q
+        ("ali@example.com", "", 422),             # bo'sh parol
+        ("", "123456", 422),                      # bo'sh email
+    ],
+)
+def test_login_cases(client, test_user, email, password, status_code):
+    response = client.post(
+        "/auth/login",
+        data={"username": email, "password": password},
+    )
+    assert response.status_code == status_code
+
+def test_me_deleted_user(authorized_client, test_user, db):
+    from app import models
+
+    db.delete(db.get(models.User, test_user["id"]))
+    db.commit()
+
+    response = authorized_client.get("/auth/me")
     assert response.status_code == 401

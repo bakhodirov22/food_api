@@ -34,3 +34,12 @@ def test_list_restaurants_empty(client):
     response = client.get("/restaurants/")
     assert response.status_code == 200
     assert response.json() == []
+
+def test_create_restaurant_empty_name(authorized_client):
+    response = authorized_client.post("/restaurants/", json={"name": ""})
+    assert response.status_code == 422
+
+
+def test_create_restaurant_long_name(authorized_client):
+    response = authorized_client.post("/restaurants/", json={"name": "A" * 1000})
+    assert response.status_code == 422

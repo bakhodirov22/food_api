@@ -111,3 +111,32 @@ def test_delete_food_without_token(client, test_foods):
 def test_delete_food_not_found(authorized_client):
     response = authorized_client.delete("/foods/99999")
     assert response.status_code == 404
+
+def test_update_food_restaurant_not_found(authorized_client, test_foods):
+    response = authorized_client.put(
+        f"/foods/{test_foods[0].id}", json={"restaurant_id": 99999}
+    )
+    assert response.status_code == 404
+
+def test_create_food_empty_name(authorized_client, test_restaurant):
+    response = authorized_client.post(
+        "/foods/",
+        json={"name": "", "price": 30000, "restaurant_id": test_restaurant.id},
+    )
+    assert response.status_code == 422
+
+
+def test_create_food_long_name(authorized_client, test_restaurant):
+    response = authorized_client.post(
+        "/foods/",
+        json={"name": "A" * 1000, "price": 30000, "restaurant_id": test_restaurant.id},
+    )
+    assert response.status_code == 422
+
+
+def test_create_food_negative_price(authorized_client, test_restaurant):
+    response = authorized_client.post(
+        "/foods/",
+        json={"name": "Burger", "price": -5, "restaurant_id": test_restaurant.id},
+    )
+    assert response.status_code == 422

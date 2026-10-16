@@ -24,8 +24,8 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 class RestaurantCreate(BaseModel):
-    name: str
-    address: str | None = None
+    name: str = Field(min_length=1, max_length=255)
+    address: str | None = Field(default=None, max_length=255)
 
 
 class RestaurantOut(BaseModel):
@@ -36,7 +36,7 @@ class RestaurantOut(BaseModel):
     model_config = {"from_attributes": True}
 
 class FoodCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     price: float = Field(gt=0)
     restaurant_id: int
 
