@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app import models, schemas
 from app.auth import get_current_user
 from app.database import get_db
+from app.routers.websocket import manager
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -106,6 +107,7 @@ def get_order(
 def change_status(
     order_id: int,
     data: schemas.OrderStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -113,4 +115,14 @@ def change_status(
     order.status = data.status.value
     db.commit()
     db.refresh(order)
+
+    background_tasks.add_task(
+        manager.send_to_user,
+        order.user_id,
+        {
+            "type": "order_status",
+            "order_id": order.id,
+            "status": order.status,
+        },
+    )
     return order_to_out(order)

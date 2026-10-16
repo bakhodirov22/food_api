@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Order Status (WebSocket)</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 40px auto; }
+        input { width: 100%; padding: 8px; margin-bottom: 8px; box-sizing: border-box; }
+        button { padding: 8px 16px; }
+        #messages { border: 1px solid #ccc; height: 250px; overflow-y: auto;
+                    padding: 10px; margin-top: 12px; }
+        .system { color: gray; font-style: italic; }
+        .status { color: green; }
+    </style>
+</head>
+<body>
+    <h2>Order status real-time</h2>
+    <input id="server" value="ws://127.0.0.1:8000" placeholder="Server manzili">
+    <input id="token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzkyMTUxMjIyfQ.lSFPdkkL5P2hZdFhc2OEHK_e2G5HoVzF_eP2A4RTqto">
+    <button onclick="connect()">Ulanish</button>
+    <button onclick="ws && ws.close()">Uzish</button>
+    <div id="messages"></div>
+
+<script>
+let ws;
+
+function add(text, cls) {
+    const div = document.createElement("div");
+    div.className = cls;
+    div.textContent = text;   // textContent: XSS xavfi yo'q
+    const box = document.getElementById("messages");
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function connect() {
+    const server = document.getElementById("server").value.trim();
+    const token = document.getElementById("token").value.trim();
+    ws = new WebSocket(`${server}/ws/orders?token=${encodeURIComponent(token)}`);
+
+    ws.onopen = () => add("Ulandi", "system");
+    ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.type === "order_status") {
+            add(`Order #${data.order_id}: ${data.status}`, "status");
+        } else {
+            add(data.message, "system");
+        }
+    };
+    ws.onclose = () => add("Ulanish yopildi (token xato bo'lishi mumkin)", "system");
+}
+</script>
+</body>
+</html>
