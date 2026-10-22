@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Kodni olish
@@ -23,9 +24,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest httpx pytest-cov
+          pip install pytest httpx pytest-cov pytest-timeout
 
       - name: Testlarni ishga tushirish
         env:
           SECRET_KEY: test-secret-key-for-ci-0123456789abcdef
-      - run: pytest --timeout=30
+        run: pytest --timeout=30
