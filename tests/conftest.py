@@ -84,3 +84,8 @@ def test_foods(db, test_restaurant):
     for f in foods:
         db.refresh(f)
     return foods
+
+@pytest.fixture(autouse=True)
+def no_real_emails(monkeypatch):
+    monkeypatch.setattr("app.routers.auth.send_welcome_email", lambda **kw: None)
+    monkeypatch.setattr("app.routers.orders.send_order_notification", lambda **kw: None)

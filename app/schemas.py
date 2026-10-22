@@ -1,4 +1,3 @@
-from pydantic import BaseModel, Field
 from datetime import datetime
 from enum import Enum
 
@@ -15,6 +14,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: str
+    avatar_url: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -22,6 +22,7 @@ class UserOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class RestaurantCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -34,6 +35,7 @@ class RestaurantOut(BaseModel):
     address: str | None = None
 
     model_config = {"from_attributes": True}
+
 
 class FoodCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -55,6 +57,7 @@ class FoodOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
 class CartAdd(BaseModel):
     food_id: int
     quantity: int = Field(default=1, ge=1)
@@ -70,6 +73,7 @@ class CartItemOut(BaseModel):
 class CartOut(BaseModel):
     items: list[CartItemOut]
     total_price: float
+
 
 class OrderStatus(str, Enum):
     pending = "pending"
@@ -97,3 +101,23 @@ class OrderOut(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: OrderStatus
+
+
+class MessageOut(BaseModel):
+    id: int
+    room: str
+    username: str
+    content: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DMOut(BaseModel):
+    id: int
+    sender_id: int
+    receiver_id: int
+    content: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

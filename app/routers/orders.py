@@ -1,3 +1,4 @@
+from app.utils.email import send_order_notification, write_log
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,7 @@ def get_own_order(order_id: int, user: models.User, db: Session) -> models.Order
 
 @router.post("/", response_model=schemas.OrderOut, status_code=201)
 def create_order(
+    background_tasks: BackgroundTasks,          # ← qo'shildi
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
@@ -77,6 +79,20 @@ def create_order(
     order.total_price = total
     db.commit()
     db.refresh(order)
+
+    # Fonda ishlaydi, foydalanuvchi kutmaydi
+    background_tasks.add_task(
+        send_order_notification,
+        email=current_user.email,
+        order_id=order.id,
+    )
+    background_tasks.add_task(
+        write_log,
+        action="order_created",
+        user_id=current_user.id,
+        details=f"order={order.id} total={total}",
+    )
+
     return order_to_out(order)
 
 

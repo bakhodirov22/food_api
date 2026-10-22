@@ -1,54 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="uz">
 <head>
-    <meta charset="utf-8">
-    <title>Order Status (WebSocket)</title>
-    <style>
-        body { font-family: Arial; max-width: 600px; margin: 40px auto; }
-        input { width: 100%; padding: 8px; margin-bottom: 8px; box-sizing: border-box; }
-        button { padding: 8px 16px; }
-        #messages { border: 1px solid #ccc; height: 250px; overflow-y: auto;
-                    padding: 10px; margin-top: 12px; }
-        .system { color: gray; font-style: italic; }
-        .status { color: green; }
-    </style>
+<meta charset="UTF-8">
+<title>Food DM</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f0f2f5; }
+  .container { max-width: 600px; margin: 20px auto; }
+  .box { background: #fff; padding: 24px; border-radius: 12px;
+         box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  .box h2 { margin-bottom: 16px; color: #1a73e8; }
+  .box input { width: 100%; padding: 10px; margin-bottom: 10px;
+               border: 1px solid #ddd; border-radius: 8px; font-size: 15px; }
+  button { padding: 10px 20px; background: #1a73e8; color: #fff;
+           border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
+  #chatBox { display: none; }
+  .header { background: #1a73e8; color: #fff; padding: 14px 20px;
+            border-radius: 12px 12px 0 0; }
+  #messages { background: #fff; height: 380px; overflow-y: auto; padding: 14px; }
+  .msg { margin-bottom: 10px; }
+  .msg.system { text-align: center; color: #888; font-size: 13px; font-style: italic; }
+  .msg.mine { text-align: right; }
+  .info { font-size: 11px; color: #888; margin-bottom: 2px; }
+  .bubble { display: inline-block; background: #f0f2f5; padding: 8px 14px;
+            border-radius: 18px; max-width: 75%; word-wrap: break-word; text-align: left; }
+  .msg.mine .bubble { background: #1a73e8; color: #fff; }
+  #typing { background: #fff; height: 22px; padding: 0 14px; font-size: 12px;
+            color: #888; font-style: italic; }
+  .input-area { display: flex; gap: 8px; padding: 12px; background: #fff;
+                border-top: 1px solid #eee; border-radius: 0 0 12px 12px; }
+  .input-area input { flex: 1; padding: 10px; border: 1px solid #ddd;
+                      border-radius: 20px; outline: none; font-size: 15px; }
+</style>
 </head>
 <body>
-    <h2>Order status real-time</h2>
-    <input id="server" value="ws://127.0.0.1:8000" placeholder="Server manzili">
-    <input id="token" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiZXhwIjoxNzkyMTUxMjIyfQ.lSFPdkkL5P2hZdFhc2OEHK_e2G5HoVzF_eP2A4RTqto">
-    <button onclick="connect()">Ulanish</button>
-    <button onclick="ws && ws.close()">Uzish</button>
+<div class="container">
+
+  <div class="box" id="loginBox">
+    <h2>✉️ Shaxsiy xabar (DM)</h2>
+    <input id="tokenInput" placeholder="Sizning access token">
+    <input id="targetInput" placeholder="Kimga yozasiz? (user ID, masalan 2)">
+    <button onclick="connect()">Kirish</button>
+  </div>
+
+  <div id="chatBox">
+    <div class="header" id="title"></div>
     <div id="messages"></div>
+    <div id="typing"></div>
+    <div class="input-area">
+      <input id="msgInput" placeholder="Xabar yozing...">
+      <button onclick="sendMessage()">Yuborish</button>
+    </div>
+  </div>
+
+</div>
 
 <script>
-let ws;
+  const API = "http://localhost:8000";
+  const $ = (id) => document.getElementById(id);
+  let ws, myId, opened = false, lastTypingSent = 0, typingTimeout;
 
-function add(text, cls) {
+  function hhmm(iso) {
+    return new Date(iso + "Z").toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function scrollDown() { $("messages").scrollTop = $("messages").scrollHeight; }
+
+  function addLine(text) {
     const div = document.createElement("div");
-    div.className = cls;
-    div.textContent = text;   // textContent: XSS xavfi yo'q
-    const box = document.getElementById("messages");
-    box.appendChild(div);
-    box.scrollTop = box.scrollHeight;
-}
+    div.className = "msg system";
+    div.textContent = text;
+    $("messages").appendChild(div);
+    scrollDown();
+  }
 
-function connect() {
-    const server = document.getElementById("server").value.trim();
-    const token = document.getElementById("token").value.trim();
-    ws = new WebSocket(`${server}/ws/orders?token=${encodeURIComponent(token)}`);
+  function addMessage(senderId, name, text, time) {
+    const mine = senderId === myId;
+    const wrap = document.createElement("div");
+    wrap.className = "msg" + (mine ? " mine" : "");
+    const info = document.createElement("div");
+    info.className = "info";
+    info.textContent = mine ? time : `${name} · ${time}`;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;          // innerHTML EMAS!
+    wrap.append(info, bubble);
+    $("messages").appendChild(wrap);
+    scrollDown();
+  }
 
-    ws.onopen = () => add("Ulandi", "system");
-    ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data.type === "order_status") {
-            add(`Order #${data.order_id}: ${data.status}`, "status");
-        } else {
-            add(data.message, "system");
-        }
+  async function connect() {
+    const token = $("tokenInput").value.trim();
+    const target = $("targetInput").value.trim();
+    if (!token || !target) { alert("Token va user ID kerak"); return; }
+
+    const headers = { Authorization: `Bearer ${token}` };
+    let history;
+    try {
+      const meRes = await fetch(`${API}/auth/me`, { headers });
+      if (!meRes.ok) { alert("Token xato yoki muddati tugagan"); return; }
+      myId = (await meRes.json()).id;
+
+      const hRes = await fetch(`${API}/ws/dm/${encodeURIComponent(target)}/history`, { headers });
+      if (hRes.status === 404) { alert("Bunday foydalanuvchi yo'q"); return; }
+      if (hRes.status === 400) { alert("O'zingizga yozib bo'lmaydi"); return; }
+      if (!hRes.ok) { alert("Xato yuz berdi"); return; }
+      history = await hRes.json();
+    } catch (e) {
+      alert("Serverga ulanib bo'lmadi");
+      return;
+    }
+
+    ws = new WebSocket(
+      `ws://localhost:8000/ws/dm/${encodeURIComponent(target)}?token=${encodeURIComponent(token)}`
+    );
+
+    ws.onopen = () => {
+      opened = true;
+      $("loginBox").style.display = "none";
+      $("chatBox").style.display = "block";
+      $("title").textContent = `✉️ Suhbat: user #${target}`;
+      history.forEach((m) =>
+        addMessage(m.sender_id, `user #${m.sender_id}`, m.content, hhmm(m.created_at))
+      );
+      if (history.length) addLine("— yuqorida oldingi xabarlar —");
+      $("msgInput").focus();
     };
-    ws.onclose = () => add("Ulanish yopildi (token xato bo'lishi mumkin)", "system");
-}
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === "message") {
+        $("typing").textContent = "";
+        addMessage(data.sender_id, data.username, data.message, data.timestamp);
+      } else if (data.type === "typing") {
+        $("typing").textContent = `${data.username} yozmoqda...`;
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => ($("typing").textContent = ""), 2000);
+      }
+    };
+
+    ws.onclose = () => {
+      if (!opened) alert("Ulanib bo'lmadi");
+      else addLine("❌ Ulanish uzildi");
+    };
+  }
+
+  function sendMessage() {
+    const input = $("msgInput");
+    const text = input.value.trim();
+    if (text && ws.readyState === WebSocket.OPEN) {
+      ws.send(text);
+      input.value = "";
+    }
+  }
+
+  $("msgInput").addEventListener("input", () => {
+    const t = Date.now();
+    if (ws && ws.readyState === WebSocket.OPEN && t - lastTypingSent > 1500) {
+      ws.send(JSON.stringify({ type: "typing" }));
+      lastTypingSent = t;
+    }
+  });
+
+  $("msgInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
 </script>
 </body>
 </html>

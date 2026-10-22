@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -10,12 +10,17 @@ from app.auth import (
     verify_password,
 )
 from app.database import get_db
+from app.utils.email import send_welcome_email, write_log
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/register", response_model=schemas.UserOut, status_code=201)
-def register(data: schemas.UserCreate, db: Session = Depends(get_db)):
+def register(
+    data: schemas.UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     existing = db.query(models.User).filter(models.User.email == data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Bu email allaqachon ro'yxatdan o'tgan")
@@ -28,6 +33,16 @@ def register(data: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Fonda ishlaydi, foydalanuvchi kutmaydi
+    background_tasks.add_task(send_welcome_email, email=user.email, username=user.name)
+    background_tasks.add_task(
+        write_log,
+        action="user_created",
+        user_id=user.id,
+        details=f"email={user.email}",
+    )
+
     return user
 
 
