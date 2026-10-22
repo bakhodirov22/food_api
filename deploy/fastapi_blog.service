@@ -8,7 +8,7 @@ Group=www-data
 WorkingDirectory=/var/www/fastapi_blog
 EnvironmentFile=/var/www/fastapi_blog/.env
 ExecStart=/var/www/fastapi_blog/venv/bin/gunicorn app.main:app \
-          --workers 3 \
+          --workers 1 \
           --worker-class uvicorn.workers.UvicornWorker \
           --bind 127.0.0.1:8000
 Restart=always
