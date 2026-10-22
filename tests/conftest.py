@@ -1,3 +1,4 @@
+import fakeredis
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,6 +16,15 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+@pytest.fixture(autouse=True)
+def fake_redis(monkeypatch):
+    # Har test uchun alohida soxta Redis: haqiqiy serverga ulanmaydi
+    server = fakeredis.FakeServer()
+    fake = fakeredis.FakeRedis(server=server, decode_responses=True)
+    monkeypatch.setattr("app.cache.redis_client", fake)
+    return fake
 
 
 @pytest.fixture()
@@ -84,6 +94,7 @@ def test_foods(db, test_restaurant):
     for f in foods:
         db.refresh(f)
     return foods
+
 
 @pytest.fixture(autouse=True)
 def no_real_emails(monkeypatch):
