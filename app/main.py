@@ -18,4 +18,4 @@ app.include_router(websocket.router)
 
 @app.get("/")
 def home():
-    return {"message": "Food API ishlayapti! CD sinovi v2"}
+    return {"message": "Food API ishlayapti!"}
