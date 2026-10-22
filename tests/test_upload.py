@@ -65,6 +65,15 @@ def test_upload_extension_comes_from_content_type(authorized_client):
     assert response.json()["filename"].endswith(".jpg")
 
 
+def test_image_endpoint_rejects_pdf(authorized_client, temp_upload_dir):
+    response = authorized_client.post(
+        "/upload/image",
+        files={"file": ("hujjat.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert list(temp_upload_dir.iterdir()) == []
+
+
 # ─── /upload/images ───────────────────────────────────────────────────
 def test_upload_multiple_success(authorized_client, temp_upload_dir):
     files = [
@@ -91,6 +100,96 @@ def test_upload_multiple_max_five(authorized_client):
     files = [("files", (f"{i}.png", b"x", "image/png")) for i in range(6)]
     response = authorized_client.post("/upload/images", files=files)
     assert response.status_code == 400
+
+
+# ─── /upload/file (rasm, PDF, video) ──────────────────────────────────
+def test_file_requires_auth(client):
+    response = client.post(
+        "/upload/file", files={"file": ("a.pdf", b"%PDF", "application/pdf")}
+    )
+    assert response.status_code == 401
+
+
+def test_file_pdf_success(authorized_client, temp_upload_dir):
+    response = authorized_client.post(
+        "/upload/file",
+        files={"file": ("hujjat.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["filename"].endswith(".pdf")
+    assert data["kind"] == "application"
+    assert data["content_type"] == "application/pdf"
+    assert data["size"] == len(b"%PDF-1.4 test")
+    assert (temp_upload_dir / data["filename"]).exists()
+
+
+def test_file_video_success(authorized_client, temp_upload_dir):
+    response = authorized_client.post(
+        "/upload/file",
+        files={"file": ("kino.mp4", b"fake-video", "video/mp4")},
+    )
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["filename"].endswith(".mp4")
+    assert data["kind"] == "video"
+    assert (temp_upload_dir / data["filename"]).exists()
+
+
+def test_file_image_success(authorized_client):
+    response = authorized_client.post("/upload/file", files=png())
+    assert response.status_code == 200
+    assert response.json()["kind"] == "image"
+
+
+def test_file_rejects_wrong_type(authorized_client, temp_upload_dir):
+    for name, content_type in [
+        ("matn.txt", "text/plain"),
+        ("dastur.exe", "application/x-msdownload"),
+        ("audio.mp3", "audio/mpeg"),
+    ]:
+        response = authorized_client.post(
+            "/upload/file", files={"file": (name, b"data", content_type)}
+        )
+        assert response.status_code == 400
+
+    assert list(temp_upload_dir.iterdir()) == []
+
+
+def test_file_pdf_too_large(authorized_client, monkeypatch, temp_upload_dir):
+    monkeypatch.setattr(
+        upload_module,
+        "MAX_SIZES",
+        {"image": 10, "application": 10, "video": 100},
+    )
+    response = authorized_client.post(
+        "/upload/file",
+        files={"file": ("katta.pdf", b"x" * 20, "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert list(temp_upload_dir.iterdir()) == []
+
+
+def test_file_video_has_its_own_limit(authorized_client, monkeypatch):
+    # PDF limiti 10 bayt, video limiti 100 bayt: 20 baytlik video o'tadi,
+    # 20 baytlik PDF o'tmaydi
+    monkeypatch.setattr(
+        upload_module,
+        "MAX_SIZES",
+        {"image": 10, "application": 10, "video": 100},
+    )
+    video = authorized_client.post(
+        "/upload/file",
+        files={"file": ("kino.mp4", b"x" * 20, "video/mp4")},
+    )
+    pdf = authorized_client.post(
+        "/upload/file",
+        files={"file": ("hujjat.pdf", b"x" * 20, "application/pdf")},
+    )
+    assert video.status_code == 200
+    assert pdf.status_code == 400
 
 
 # ─── /upload/avatar ───────────────────────────────────────────────────
@@ -134,6 +233,15 @@ def test_avatar_rejects_wrong_type(authorized_client, temp_upload_dir):
     assert response.status_code == 400
     assert list(temp_upload_dir.iterdir()) == []
     assert authorized_client.get("/auth/me").json()["avatar_url"] is None
+
+
+def test_avatar_rejects_pdf(authorized_client, temp_upload_dir):
+    response = authorized_client.post(
+        "/upload/avatar",
+        files={"file": ("hujjat.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert list(temp_upload_dir.iterdir()) == []
 
 
 def test_avatar_rejects_too_large(authorized_client, monkeypatch, temp_upload_dir):
