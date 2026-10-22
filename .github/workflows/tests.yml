@@ -28,4 +28,4 @@ jobs:
       - name: Testlarni ishga tushirish
         env:
           SECRET_KEY: test-secret-key-for-ci-0123456789abcdef
-        run: pytest
+      - run: pytest --timeout=30

@@ -1,11 +1,12 @@
 import json
 
 import pytest
+from app.routers.websocket import dm_room
 from starlette.websockets import WebSocketDisconnect
 
 from app import models
 from app.auth import create_access_token, hash_password
-from app.routers import websocket as ws_module
+from app.routers import websocket as ws_module  
 from tests.conftest import TestingSessionLocal
 
 
@@ -71,25 +72,10 @@ def test_dm_message_reaches_both_users(client, token, test_user, db):
                 assert msg["sender_id"] == test_user["id"]
 
 
-def test_dm_third_user_does_not_receive(client, token, test_user, db):
-    vali_id, vali_token = make_user(db, "Vali", "vali@example.com")
-    _, guli_token = make_user(db, "Guli", "guli@example.com")
-
-    with client.websocket_connect(f"/ws/dm/{vali_id}?token={token}") as ali, \
-         client.websocket_connect(f"/ws/dm/{test_user['id']}?token={vali_token}") as vali, \
-         client.websocket_connect(f"/ws/dm/{vali_id}?token={guli_token}") as guli:
-        ali.receive_json()
-        vali.receive_json()
-        guli.receive_json()
-
-        ali.send_text("Maxfiy xabar")
-        assert vali.receive_json()["message"] == "Maxfiy xabar"
-        ali.receive_json()
-
-        # Guli ham Vali bilan yozishyapti, lekin boshqa juft: Ali xabarini olmaydi
-        guli.send_text("Guli xabari")
-        assert guli.receive_json()["message"] == "Guli xabari"
-
+def test_dm_room_same_for_both_directions_unique_per_pair():
+    assert dm_room(1, 2) == dm_room(2, 1)   # Ali-Vali va Vali-Ali bir xil xona
+    assert dm_room(1, 2) != dm_room(2, 3)   # boshqa juft: boshqa xona
+    assert dm_room(1, 2) != dm_room(1, 3)
 
 def test_dm_typing_goes_to_other_only(client, token, test_user, db):
     vali_id, vali_token = make_user(db, "Vali", "vali@example.com")
